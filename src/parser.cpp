@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "symbol_table.h"
 #include <iostream>
 #include <cstdlib>
 
@@ -15,7 +16,7 @@ void getNextToken() {
 }
 
 void error(string msg) {
-    cout << "Parser Error: " << msg << " at line " << currentToken.line << endl;
+    cout << "Semantic/Parser Error: " << msg << " at line " << currentToken.line << endl;
     exit(1);
 }
 
@@ -45,8 +46,21 @@ void st() {
     else error("Unexpected token in statement: " + currentToken.type);
 }
 
-void ws() { eat("JABTAK"); eat("LPAREN"); ex(); eat("RPAREN"); cst(); }
-void cst() { eat("SHRO"); slist(); eat("KHTAM"); }
+void ws() { 
+    eat("JABTAK"); 
+    eat("LPAREN"); 
+    ex(); 
+    eat("RPAREN"); 
+    cst(); 
+}
+
+void cst() { 
+    eat("SHRO"); 
+    currentScope++;
+    slist(); 
+    currentScope--;
+    eat("KHTAM"); 
+}
 
 void slist() {
     while (currentToken.type == "JABTAK" || currentToken.type == "SHRO" ||
@@ -57,26 +71,61 @@ void slist() {
     }
 }
 
-void ds() { eat(currentToken.type); eat("ID"); }
-void as_stmt() { eat("ID"); eat("MELADO"); ex(); }
+void ds() { 
+    string varType = currentToken.value; 
+    eat(currentToken.type); 
+    
+    string varName = currentToken.value; 
+    eat("ID"); 
+    
+    insertSymbol(varName, varType); 
+}
+
+void as_stmt() { 
+    string varName = currentToken.value;
+    eat("ID"); 
+    
+    if (lookupSymbol(varName) == "UNDEFINED") {
+        error("Variable '" + varName + "' is not declared.");
+    }
+    
+    eat("MELADO");
+    ex(); 
+}
 
 void ex() { t(); ex_prime(); }
+
 void ex_prime() {
     if (currentToken.type == "PLUS") { eat("PLUS"); t(); ex_prime(); }
     else if (currentToken.type == "MINUS") { eat("MINUS"); t(); ex_prime(); }
 }
 
 void t() { f(); t_prime(); }
+
 void t_prime() {
     if (currentToken.type == "MULT") { eat("MULT"); f(); t_prime(); }
     else if (currentToken.type == "DIV") { eat("DIV"); f(); t_prime(); }
 }
 
 void f() {
-    if (currentToken.type == "ID") eat("ID");
-    else if (currentToken.type == "LT") eat("LT");
-    else if (currentToken.type == "LPAREN") { eat("LPAREN"); ex(); eat("RPAREN"); }
-    else error("Unexpected token in factor: " + currentToken.type);
+    if (currentToken.type == "ID") {
+        string varName = currentToken.value;
+        if (lookupSymbol(varName) == "UNDEFINED") {
+            error("Variable '" + varName + "' is not declared.");
+        }
+        eat("ID");
+    }
+    else if (currentToken.type == "LT") {
+        eat("LT");
+    }
+    else if (currentToken.type == "LPAREN") { 
+        eat("LPAREN"); 
+        ex(); 
+        eat("RPAREN"); 
+    }
+    else {
+        error("Unexpected token in factor: " + currentToken.type);
+    }
 }
 
 void parse(vector<Token> tokens) {
